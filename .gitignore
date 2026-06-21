@@ -1,7 +1,7 @@
 # Bỏ qua file môi trường
 .env
 
-.test
+scripts/test.py
 
 # Bỏ qua tất cả file log
 *.log
