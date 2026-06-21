@@ -1,0 +1,26 @@
+# Bỏ qua file môi trường
+.env
+
+.test
+
+# Bỏ qua tất cả file log
+*.log
+
+# Bỏ qua folder
+node_modules/
+
+# Bỏ qua file notebook output
+.ipynb_checkpoints/
+
+# Bỏ qua file Python cache
+__pycache__/
+*.pyc
+
+# Bỏ qua file config cá nhân
+config.local.json
+
+# Bỏ qua toàn bộ thư mục data
+data/
+
+# Nhưng vẫn giữ file mẫu
+!data/example.json
