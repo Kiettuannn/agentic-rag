@@ -1,4 +1,5 @@
 from __future__ import annotations
+from langchain_core.documents import Document
 
 import networkx as nx
 from typing import Iterable
@@ -126,7 +127,7 @@ def graph_search(
   k: int = 5,
   initial_k: int = 3,
   max_hops: int = 2,
-):
+) -> list[Document]:
   """
   Hybrid search:
   dense retrieval -> graph expansion -> document aggregation
