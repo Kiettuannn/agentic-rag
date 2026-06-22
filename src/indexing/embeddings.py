@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Model dung de convert tu text sang vector embeddings
 from sentence_transformers import SentenceTransformer
@@ -20,8 +21,12 @@ class Embedder:
     self,
     model_name: str = "intfloat/multilingual-e5-base",
   ):
+    self.model_name = model_name
+
     # Load model vam ram, nen chi load 1 lan
     self.model = SentenceTransformer(model_name)
+
+    self.langchain_embedding = HuggingFaceEmbeddings(model_name=model_name)
   
   def embed_documents(
     self,
@@ -71,18 +76,3 @@ class Embedder:
       normalize_embeddings=True,
     )
     return embedding.tolist()
-  
-
-docs = [
-    Document(page_content="Điều 1. Quy định chung"),
-    Document(page_content="Điều 2. Phạm vi áp dụng")
-]
-
-embedder = Embedder()
-
-doc_vectors = embedder.embed_documents(docs)
-query_vector = embedder.embed_query("quy định chung là gì")
-
-print(len(doc_vectors))
-print(len(doc_vectors[0]))
-print(len(query_vector))
