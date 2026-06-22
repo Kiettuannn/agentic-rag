@@ -1,4 +1,6 @@
 from __future__ import annotations
+import os
+import shutil
 
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
@@ -7,7 +9,7 @@ from src.indexing.embeddings import Embedder
 class ChromaStore:
   def __init__(
     self,
-    persist_directory: str = "/data/chroma_store",
+    persist_directory: str = "data/chroma_store",
   ):
     
     self.persist_directory = persist_directory
@@ -20,6 +22,11 @@ class ChromaStore:
     self,
     documents: list[Document],
   ):
+    
+    if os.path.exists(self.persist_directory):
+      print(f"Removing existing Chroma store at {self.persist_directory}...")
+      shutil.rmtree(self.persist_directory)
+      
     self.store = Chroma.from_documents(
       documents=documents,
       embedding=self.embedder.langchain_embedding,

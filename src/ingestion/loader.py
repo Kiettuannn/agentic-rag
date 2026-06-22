@@ -114,7 +114,7 @@ def load_documents(
     content_df = pd.read_parquet(parquet_url)
 
     if sample_size:
-        content_df = content_df.head(sample_size)
+        content_df = content_df.sample(n=sample_size, random_state=42)
 
     docs = []
     skipped = 0
@@ -151,3 +151,50 @@ def load_documents(
     print(f"[Bỏ qua] Đã bỏ qua {skipped} dòng không hợp lệ.")
 
     return docs
+
+
+
+def load_relationships(
+    config: dict,
+    sample_size: Optional[int] = None,
+) -> list[dict]:
+    """
+    Load quan hệ giữa các văn bản pháp luật.
+    """
+
+    dataset_name = config["dataset"]["name"]
+
+    print("--> Đang tải relationships...")
+
+    relationship_ds = load_dataset(
+        dataset_name,
+        "relationships",
+        split="data"
+    )
+
+    if sample_size:
+        relationship_ds = relationship_ds.select(
+            range(sample_size)
+        )
+
+    relationships = []
+
+    for row in relationship_ds:
+        doc_id = row.get("doc_id")
+        other_doc_id = row.get("other_doc_id")
+        relationship = row.get("relationship")
+
+        if not doc_id or not other_doc_id:
+            continue
+
+        relationships.append({
+            "doc_id": str(doc_id),
+            "other_doc_id": str(other_doc_id),
+            "relationship": relationship
+        })
+
+    print(f"[Thành công] Loaded {len(relationships)} relationships")
+
+    return relationships
+
+
