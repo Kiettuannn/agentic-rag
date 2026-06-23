@@ -1,0 +1,26 @@
+dataset:
+  name: "th1nhng0/vietnamese-legal-documents"
+
+chunking:
+  chunk_size: 1200
+  chunk_overlap: 200
+
+indexing:
+  chroma_persist_path: "data/chroma_store"
+  bm25_persist_path: "data/bm25_index.pkl"
+
+retrieval: 
+  default_k:5
+  graph_initial_k: 3
+  graph_max_hops: 2
+
+agent:
+  max_retries: 2
+  reflection_threshold: 0.5 # score < 0.5 => retry
+
+llm:
+# this only fallback. The truth value loaded from env 
+  model: "z-ai/glm-5.2-free"
+  temperature: 0.1
+  max_tokens: 2048
+
