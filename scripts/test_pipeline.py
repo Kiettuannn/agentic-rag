@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 # Load raw legal docs
 from src.ingestion.loader import load_documents, load_relationships
@@ -26,6 +27,9 @@ from src.generation.answer import AnswerGenerator
 
 # LLM client (ví dụ OpenAI-compatible)
 from openai import OpenAI
+
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file
 
 config = {
     "dataset": {
@@ -121,8 +125,8 @@ def main():
 
     # dùng provider bạn đang dùng
     client = OpenAI(
-        base_url="https://zenmux.ai/api/v1",
-        api_key="sk-ai-v1-45daf105a7c5cf1ef4c83c53607f94f03ff2297a75087df26c8516ecc142e7c5"
+        base_url=os.getenv("LLM_BASE_URL"),
+        api_key=os.getenv("LLM_API_KEY")
     )
 
     class SimpleLLM:

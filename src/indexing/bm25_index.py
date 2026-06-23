@@ -9,7 +9,7 @@ from rank_bm25 import BM25Okapi
 class BM25Index:
   def __init__(
     self,
-    persist_path: str = "/data/bm25_index.pkl",
+    persist_path: str = "data/bm25_index.pkl",
   ):
     self.persist_path = persist_path
     self.bm25 = None

@@ -46,7 +46,7 @@ class ChromaStore:
   def load(self):
     self.store = Chroma(
       persist_directory=self.persist_directory,
-      embedding_function=self.langchain_embedding,
+      embedding_function=self.embedder.langchain_embedding,
     )
     return self.store
   

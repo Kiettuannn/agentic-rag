@@ -72,7 +72,6 @@ class AnswerGenerator:
       print(f"Metadata: {doc.metadata}")
       print("-" * 50)
 
-      # chỉ in 300 chars đầu để dễ đọc
       print(doc.page_content[:300])
 
       print("-" * 50)
