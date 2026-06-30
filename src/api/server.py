@@ -16,8 +16,9 @@ from src.indexing.chroma_store import ChromaStore
 from src.indexing.bm25_index import BM25Index
 from src.ingestion.loader import load_relationships
 from src.retrieval.graph import build_graph
-from src.agents.orchestrator import RagOrchestrator
-
+from src.agents.orchestrator import RAGOrchestrator
+from src.llm import LLMClient
+from src.retrieval.retriever import Retriever
 class ChatRequest(BaseModel):
   query: str
 
@@ -47,12 +48,13 @@ async def lifespan(app: FastAPI):
   graph = build_graph(relationships)
   print("Da tai xong Knowledgge Graph")
 
+  # Khoi tao Retriever va LLM
+  print("Dang khoi tao Retriever va LLM ...")
+  retriever = Retriever(store=store, bm25_index=bm25, graph=graph)
+  llm = LLMClient().from_config(config)
+
   # Khoi tao Orchestrator
-  global_orchestrator = RagOrchestrator(
-    store=store,
-    bm25=bm25,
-    graph=graph,
-  )
+  global_orchestrator = RAGOrchestrator(retriever=retriever, llm=llm)
   print("SERVER DA SAN SANG TAI CONG 8000")
 
   yield
@@ -75,9 +77,9 @@ async def chat_endpoint(request: ChatRequest):
   result = global_orchestrator.run(request.query)
 
   return {
-    "answer": result["answer"],
-    "strategy": result["strategy"],
-    "retry_count": result["retry"],
+    "answer": result.get("final_answer", ""),
+    "strategy": result.get("strategy", ""),
+    "retry_count": result.get("retry_count", 0),
   }
 
 os.makedirs("ui", exist_ok=True)
