@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic RAG - Pháp Luật</title>
+    <!-- Import Font chữ hiện đại -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Import thư viện render Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Phần tiêu đề Header -->
+        <header class="chat-header">
+            <div class="logo">⚖️ Agentic RAG</div>
+            <div class="status">Trợ lý Pháp luật (Online)</div>
+        </header>
+
+        <!-- Khung hiển thị nội dung chat -->
+        <main class="chat-box" id="chat-box">
+            <!-- Lời chào mặc định -->
+            <div class="message bot-message">
+                <div class="avatar">🤖</div>
+                <div class="message-content">
+                    Xin chào! Tôi là Trợ lý Pháp luật thông minh (được nhúng Agentic RAG). Tôi có thể giúp gì cho bạn hôm nay?
+                </div>
+            </div>
+        </main>
+
+        <!-- Thanh nhập liệu -->
+        <footer class="chat-input-area">
+            <textarea id="user-input" placeholder="Nhập câu hỏi pháp lý của bạn vào đây..." rows="1" autofocus></textarea>
+            <button id="send-btn" title="Gửi câu hỏi">
+                <!-- Icon nút gửi SVG -->
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
