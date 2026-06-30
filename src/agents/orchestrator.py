@@ -22,8 +22,8 @@ def build_rag_graph(
   graph.add_node("retriever_node", nodes.retriever_node)
   graph.add_node("answer_node", nodes.answer_node)
   graph.add_node("reflection_node", nodes.reflection_node)
-  graph.add_node("final_answer_node", nodes.finalize_node)
-
+  graph.add_node("increment_retry_node", nodes.increment_retry_node)
+  graph.add_node("finalize_node", nodes.finalize_node)
 
   # Define edges
 
@@ -36,14 +36,17 @@ def build_rag_graph(
   graph.add_edge("answer_node", "reflection_node")
 
   # Conditional edge: retry or finalize
-  graph.add_conditional_edge(
+  graph.add_conditional_edges(
     source="reflection_node",
     path=nodes.should_retry,
     path_map={
-      "retriever_node": "retriever_node",
+      "increment_retry_node": "increment_retry_node",
       "finalize_node": "finalize_node"
     }
   )
+
+  # Retry loop: increment_retry_node -> retriever_node
+  graph.add_edge("increment_retry_node", "retriever_node")
 
   # Terminal edge
   graph.add_edge("finalize_node", END)

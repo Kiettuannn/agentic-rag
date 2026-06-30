@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # pickle de save/load bm25 object xuong disk
+import os
 import pickle
 
 from langchain_core.documents import Document
@@ -28,10 +29,15 @@ class BM25Index:
     # luu full documents de mapping ket qua sau search
     self.documents = documents
 
-    # tokenize tung document
-    tokenized_docs = [
-      self.tokenize(doc.page_content) for doc in documents
-    ]
+    # tokenize tung document (kết hợp cả metadata để tìm kiếm keyword tốt hơn)
+    tokenized_docs = []
+    for doc in documents:
+        doc_id = str(doc.metadata.get("doc_id", ""))
+        title = str(doc.metadata.get("title", ""))
+        
+        # Gộp doc_id, title và nội dung vào chung để BM25 index
+        combined_text = f"{doc_id} {title} {doc.page_content}"
+        tokenized_docs.append(self.tokenize(combined_text))
 
     # build bm25 index
     self.bm25 = BM25Okapi(tokenized_docs)
@@ -41,6 +47,8 @@ class BM25Index:
   def save(self):
     if self.bm25 is None:
       raise ValueError("BM25 index is not built yet. Call build() first.")
+
+    os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
     
     with open(self.persist_path, "wb") as f:
       pickle.dump(

@@ -127,14 +127,19 @@ def graph_search(
   k: int = 5,
   initial_k: int = 3,
   max_hops: int = 2,
+  bm25_index=None,
 ) -> list[Document]:
   """
   Hybrid search:
-  dense retrieval -> graph expansion -> document aggregation
+  dense/hybrid retrieval -> graph expansion -> document aggregation
   """
 
-  # Step 1: Dense retrieval
-  seed_docs = dense_search(store, query, k=initial_k)
+  # Step 1: Tìm seed docs (ưu tiên hybrid để bắt keyword chính xác như "93493")
+  if bm25_index:
+    from .hybrid import hybrid_search
+    seed_docs = hybrid_search(store, bm25_index, query, k=initial_k)
+  else:
+    seed_docs = dense_search(store, query, k=initial_k)
 
   # Step 2: Extract seed doc_ids
   seed_doc_ids = {

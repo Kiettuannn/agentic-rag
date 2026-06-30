@@ -23,7 +23,7 @@ def get_llm_settings() -> dict:
   return {
     "base_url": os.getenv("LLM_BASE_URL"),
     "api_key": os.getenv("LLM_API_KEY"),
-    "model": os.getenv("LLM_MODEL", "z-ai/glm-5.2-free"),
+    "model": os.getenv("LLM_MODEL", ""),
   }
 
 def get_paths(config: dict) -> dict:

@@ -1,3 +1,4 @@
+import os
 import re
 import unicodedata
 from typing import List
@@ -6,6 +7,8 @@ from concurrent.futures import ProcessPoolExecutor
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from langchain_core.documents import Document
+
+
 
 def _strip_html(html: str) -> str:
   """
@@ -73,7 +76,7 @@ def clean_documents(docs: List[Document], workers: int = 1) -> List[Document]:
   workers > 1: -> parallel processing using ProcessPoolExecutor
 
   """
-
+  
   # Sequential mode (easy to debug)
   if workers <= 1:
     return [

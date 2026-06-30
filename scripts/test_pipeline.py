@@ -2,6 +2,8 @@ from __future__ import annotations
 import os
 
 # Load raw legal docs
+# from src.ingestion.loader import load_documents, load_relationships
+
 from src.ingestion.loader import load_documents, load_relationships
 
 # Clean HTML/legal text
@@ -31,30 +33,22 @@ from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 
-config = {
-    "dataset": {
-        "name": "th1nhng0/vietnamese-legal-documents"
-    },
-    "chunking": {
-        "chunk_size": 1200,
-        "chunk_overlap": 200
-    }
-}
+from configs.setting import load_config, get_llm_settings
+from src.llm import LLMClient
+from src.agents.orchestrator import RAGOrchestrator
+
+
+# Load config
+config = load_config()
 
 
 def main():
-    """
-    End-to-end pipeline test.
-    """
-
-    
 
     print("=" * 60)
     print("STEP 1: LOAD DOCUMENTS")
     print("=" * 60)
 
-    # chỉ lấy sample nhỏ để test nhanh
-    docs = load_documents(config=config, sample_size=20)
+    docs = load_documents(config=config, sample_size=100)  # Load a sample of 10 documents for testing
 
     print(f"Loaded {len(docs)} documents")
 
@@ -62,7 +56,9 @@ def main():
     print("STEP 2: CLEAN DOCUMENTS")
     print("=" * 60)
 
-    cleaned_docs = clean_documents(docs)
+    # num_workers = max(1, os.cpu_count() - 2)
+
+    cleaned_docs = clean_documents(docs, workers=2)
 
     print(f"Cleaned {len(cleaned_docs)} documents")
 
@@ -89,6 +85,7 @@ def main():
 
     bm25 = BM25Index()
     bm25.build(chunks)
+    bm25.save()  # Save BM25 index to disk
 
     print("BM25 built successfully")
 
@@ -98,7 +95,7 @@ def main():
 
     # TODO:
     # thay bằng relationship loader thật của bạn
-    relationships = load_relationships(config=config, sample_size=20)
+    relationships = load_relationships(config=config,sample_size=100)
 
     graph = build_graph(relationships)
 
@@ -123,63 +120,19 @@ def main():
     print("STEP 8: CREATE LLM")
     print("=" * 60)
 
-    # dùng provider bạn đang dùng
-    client = OpenAI(
-        base_url=os.getenv("LLM_BASE_URL"),
-        api_key=os.getenv("LLM_API_KEY")
-    )
-
-    class SimpleLLM:
-        """
-        Adapter để unify interface với .invoke()
-        """
-
-        def invoke(self, prompt: str):
-            response = client.chat.completions.create(
-                model="z-ai/glm-5.2-free",
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
-
-            class Result:
-                content = response.choices[0].message.content
-
-            return Result()
-
-    llm = SimpleLLM()
-
-    print("LLM ready")
+    llm = LLMClient.from_config(config)
+    orchestrator = RAGOrchestrator(retriever=retriever, llm=llm)
 
     print("=" * 60)
-    print("STEP 9: CREATE ANSWER GENERATOR")
+    print("STEP 9: TEST ORCHESTRATOR")
     print("=" * 60)
 
-    generator = AnswerGenerator(
-        retriever=retriever,
-        llm=llm
-    )
-
-    print("Answer generator ready")
-
-    print("=" * 60)
-    print("STEP 10: QUERY")
-    print("=" * 60)
-
-    result = generator.generate(
-        query="Điều kiện chuyển nhượng quyền sử dụng đất là gì?",
-        strategy="hybrid",
-        k=5
-    )
-
-    print("\nANSWER:\n")
-    print(result["answer"])
-
-    print("\nSOURCES:\n")
-
-    for doc in result["documents"]:
-        print(doc.metadata)
-
+    result = orchestrator.run("Đối tượng nộp thuế?")
+    print(f"\nStrategy chọn: {result['strategy']}")
+    print(f"Lý do: {result['strategy_reason']}")
+    print(f"Retry count: {result['retry_count']}")
+    print(f"Reflection: {result['reflection']}")
+    print(f"\nANSWER:\n{result['final_answer']}")
 
 if __name__ == "__main__":
     main()

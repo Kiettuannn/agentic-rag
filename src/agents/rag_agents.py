@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TypeDict, Literal
+from typing import TypedDict, Literal
 
 from langchain_core.documents import Document
 
@@ -11,7 +11,7 @@ from src.llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
-class RAGState(TypeDict):
+class RAGState(TypedDict):
   query: str 
   strategy: str
   strategy_reason: str
@@ -44,22 +44,22 @@ class RAGNodes:
     logger.info(f"[query_analyzer] Analyzing query: {query[:180]}...")
 
     prompt = f"""Bạn là chuyên gia phân tích câu hỏi pháp lý.
-Phân tích câu hỏi sau và chọn chiến lược tìm kiếm phù hợp nhất:
-CÂU HỎI: {query}
-CÁC CHIẾN LƯỢC:
-- "dense": Tìm kiếm theo ngữ nghĩa. Dùng khi câu hỏi hỏi về ý nghĩa, khái niệm, điều kiện, quy định chung.
-  Ví dụ: "Điều kiện để được cấp phép kinh doanh là gì?"
-  
-- "hybrid": Tìm kiếm kết hợp ngữ nghĩa + từ khóa. Dùng khi câu hỏi có tên văn bản cụ thể, số hiệu luật, điều khoản cụ thể.
-  Ví dụ: "Điều 17 Luật Đất đai 2024 quy định gì?"
-  
-- "graph": Tìm kiếm theo mạng lưới quan hệ văn bản. Dùng khi câu hỏi về mối quan hệ giữa nhiều văn bản, hiệu lực, sửa đổi, thay thế.
-  Ví dụ: "Những văn bản nào sửa đổi bổ sung Luật Đầu tư 2020?"
-Trả về JSON với format sau (KHÔNG thêm gì khác):
-{{
-  "strategy": "dense" | "hybrid" | "graph",
-  "reason": "giải thích ngắn gọn tại sao chọn strategy này"
-}}"""
+            Phân tích câu hỏi sau và chọn chiến lược tìm kiếm phù hợp nhất:
+            CÂU HỎI: {query}
+            CÁC CHIẾN LƯỢC:
+            - "dense": Tìm kiếm theo ngữ nghĩa. Dùng khi câu hỏi hỏi về ý nghĩa, khái niệm, điều kiện, quy định chung.
+              Ví dụ: "Điều kiện để được cấp phép kinh doanh là gì?"
+              
+            - "hybrid": Tìm kiếm kết hợp ngữ nghĩa + từ khóa. Dùng khi câu hỏi có tên văn bản cụ thể, số hiệu luật, điều khoản cụ thể.
+              Ví dụ: "Điều 17 Luật Đất đai 2024 quy định gì?"
+              
+            - "graph": Tìm kiếm theo mạng lưới quan hệ văn bản. Dùng khi câu hỏi về mối quan hệ giữa nhiều văn bản, hiệu lực, sửa đổi, thay thế.
+              Ví dụ: "Những văn bản nào sửa đổi bổ sung Luật Đầu tư 2020?"
+            Trả về JSON với format sau (KHÔNG thêm gì khác):
+            {{
+              "strategy": "dense" | "hybrid" | "graph",
+              "reason": "giải thích ngắn gọn tại sao chọn strategy này"
+            }}"""
     
     try:
       raw = self.llm.invoke_json(prompt)
@@ -221,30 +221,44 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
     return {
       "final_answer": state["answer"]
     }
-  
+
+  def increment_retry_node(self, state: RAGState) -> dict:
+    """
+    Node trung gian: tăng retry_count lên 1 trước khi quay lại retriever.
+
+    Tại sao cần node riêng:
+    LangGraph không cho phép mutate state trong conditional edge function.
+    State chỉ được update thông qua giá trị return của NODE.
+    Nếu viết state["retry_count"] = ... trong edge -> không có tác dụng,
+    retry_count luôn = 0 -> vòng lặp vô hạn.
+    """
+    current = state.get("retry_count", 0)
+    logger.info(f"[increment_retry] retry_count: {current} -> {current + 1}")
+    return {"retry_count": current + 1}
+
   # CONDITIONAL EDGE: should_retry
   def should_retry(
-    self, 
-    state: RAGState) -> Literal["retriever_node", "finalize_node"]:
+    self,
+    state: RAGState) -> Literal["increment_retry_node", "finalize_node"]:
     """
-    Return: node name to go next
-    """
+    Conditional edge: quyết định retry hay kết thúc.
 
+    Trả về tên node tiếp theo.
+    Không được mutate state ở đây!
+    """
     reflection = state.get("reflection", "sufficient")
     retry_count = state.get("retry_count", 0)
     max_retries = 2
 
     if reflection == "insufficient" and retry_count < max_retries:
       logger.info(
-        f"[should_retry] Retrying..."
-        f")attempt {retry_count + 1}/{max_retries}"
+        f"[should_retry] Retrying "
+        f"(attempt {retry_count + 1}/{max_retries})"
       )
-      state["retry_count"] = retry_count + 1
-      return "retriever_node"
+      return "increment_retry_node"
     else:
       if reflection == "insufficient":
         logger.info("[should_retry] Max retries reached. Finalizing answer.")
       else:
         logger.info("[should_retry] Answer sufficient. Finalizing answer.")
-
       return "finalize_node"

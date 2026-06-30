@@ -47,7 +47,13 @@ class Retriever:
       return hybrid_search(store=self.store, bm25_index=self.bm25_index, query=query, k=k)
     
     elif strategy == "graph":
-      return graph_search(store=self.store, graph=self.graph, query=query, k=k)
+      return graph_search(
+        store=self.store,
+        graph=self.graph,
+        query=query,
+        k=k,
+        bm25_index=self.bm25_index
+      )
     
     raise ValueError(f"Invalid retrieval strategy: {strategy}. Must be one of ['dense', 'hybrid', 'graph'].")
     
