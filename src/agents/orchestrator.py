@@ -61,9 +61,12 @@ class RAGOrchestrator:
   def __init__(self, retriever: Retriever, llm: LLMClient):
     self.graph = build_rag_graph(retriever, llm)
   
-  def run(self, query: str) -> dict:
+  def run(self, query: str, history: list = None) -> dict:
+    history = history or []
     initial_state: RAGState ={
       "query": query,
+      "history": history,
+      "search_query": query,  # default search query, will be updated by query_analyzer
       "strategy": "hybrid", # default strategy, will be updated by query_analyzer
       "strategy_reason": "",
       "documents": [],
@@ -85,7 +88,8 @@ class RAGOrchestrator:
       "documents": final_state.get("documents", []),
       "reflection": final_state.get("reflection", ""),
       "reflection_reason": final_state.get("reflection_reason", ""),
-      "retry_count": final_state.get("retry_count", 0)
+      "retry_count": final_state.get("retry_count", 0),
+      "search_query": final_state.get("search_query", query)
     }
   
 

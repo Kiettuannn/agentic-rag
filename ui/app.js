@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatBox = document.getElementById('chat-box');
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
+    let chatHistory = []; // Lưu trữ lịch sử chat
 
     // Tự động điều chỉnh chiều cao của ô nhập liệu
     userInput.addEventListener('input', function() {
@@ -25,7 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Hiển thị tin nhắn của User
         appendMessage('user', text);
-        
+
+        chatHistory.push({ role: 'user', content: text }); // Lưu vào lịch sử chat
+
+        if(chatHistory.length > 6) {
+            chatHistory = chatHistory.slice(chatHistory.length - 6); // Giữ lại 6 tin nhắn gần nhất
+        }
+
         // Reset ô nhập
         userInput.value = '';
         userInput.style.height = 'auto';
@@ -39,7 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: text })
+                body: JSON.stringify({ 
+                    query: text,
+                    history: chatHistory
+                 })
             });
 
             const data = await response.json();
@@ -51,8 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendMessage('bot', `**Lỗi:** ${data.error}`);
             } else {
                 // 4. Hiển thị tin nhắn của Bot (có chứa Strategy và Retry)
-                appendBotMessageWithMeta(data.answer, data.strategy, data.retry_count);
+                appendBotMessageWithMeta(data.answer, data.strategy, data.retry_count, data.search_query, data.strategy_reason, data.reflection_reason
+                );
+
+                chatHistory.push({ role: 'bot', content: data.answer }); // Lưu vào lịch sử chat
+                if(chatHistory.length > 6) {
+                    chatHistory = chatHistory.slice(chatHistory.length - 6); // Giữ lại 6 tin nhắn gần nhất
+                }
             }
+
 
         } catch (error) {
             removeMessage(loadingId);
@@ -82,7 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Hàm tạo Bong bóng chat có gắn nhãn Strategy & Retry cho BOT
-    function appendBotMessageWithMeta(text, strategy, retryCount) {
+    function appendBotMessageWithMeta(text, strategy, retryCount, searchQuery, strategyReason, reflectionReason) {
+        text = text || "";
+        strategy = strategy || "";
+        searchQuery = searchQuery || "";
+        
         const div = document.createElement('div');
         div.className = `message bot-message`;
         
@@ -93,13 +114,30 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="meta-badges">
                 <span class="badge badge-strategy">🧠 Chiến lược: ${strategy}</span>
                 <span class="badge badge-retry">🔄 Lần thử: ${retryCount}</span>
+                <span class="badge badge-strategy" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border-color: rgba(59, 130, 246, 0.4);">
+                    📝 Đã hiểu ý: "${searchQuery}"
+                </span>
             </div>
         `;
+
+        let thoughtsHtml = '';
+        if (strategyReason || reflectionReason) {
+            thoughtsHtml = `
+                <details class="thought-process">
+                    <summary class="thought-summary">🔍 Nhấn để xem quá trình phân tích...</summary>
+                    <div class="thought-content">
+                        ${strategyReason ? `<strong>Phân tích Chiến lược:</strong><br>${escapeHTML(strategyReason)}<br><br>` : ''}
+                        ${reflectionReason ? `<strong>Trạm kiểm duyệt (Reflection):</strong><br>${escapeHTML(reflectionReason)}` : ''}
+                    </div>
+                </details>
+            `;
+        }
 
         div.innerHTML = `
             <div class="avatar">🤖</div>
             <div class="message-content">
                 ${badgesHtml}
+                ${thoughtsHtml}
                 ${htmlContent}
             </div>
         `;
@@ -139,7 +177,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Lọc ký tự HTML độc hại từ người dùng (Chống XSS)
     function escapeHTML(str) {
-        return str.replace(/[&<>'"]/g, 
+        if (!str) return "";
+        return String(str).replace(/[&<>'"]/g, 
             tag => ({
                 '&': '&amp;',
                 '<': '&lt;',

@@ -252,6 +252,7 @@ textarea::placeholder {
     padding: 8px 4px;
 }
 .typing-indicator span {
+    display: inline-block;
     width: 8px;
     height: 8px;
     background: rgba(255,255,255,0.4);
@@ -263,4 +264,84 @@ textarea::placeholder {
 @keyframes bounce {
     0%, 80%, 100% { transform: scale(0); }
     40% { transform: scale(1); background: #3b82f6; }
+}
+
+/* Khung hiển thị Luồng suy nghĩ (Thought Process) */
+.thought-process {
+    margin-bottom: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+/* Thanh tiêu đề có thể click để mở ra */
+.thought-summary {
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+}
+.thought-summary:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #d1d5db;
+}
+
+/* Nội dung suy nghĩ bên trong */
+.thought-content {
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    color: #a78bfa;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    line-height: 1.5;
+    font-family: monospace; /* Font chữ kiểu gõ code/terminal */
+}
+.thought-content strong {
+    color: #e2e8f0;
+}
+
+/* Khung hiển thị Luồng suy nghĩ (Thought Process) */
+.thought-process {
+    margin-bottom: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+/* Thanh tiêu đề có thể click để mở ra */
+.thought-summary {
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+}
+.thought-summary:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #d1d5db;
+}
+
+/* Nội dung suy nghĩ bên trong */
+.thought-content {
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    color: #a78bfa;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    line-height: 1.5;
+    font-family: monospace; /* Font chữ kiểu gõ code/terminal */
+}
+.thought-content strong {
+    color: #e2e8f0;
 }

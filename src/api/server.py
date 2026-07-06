@@ -4,6 +4,7 @@ import sys
 # Tat log rac va sua loi font tieng viet tren terminal windowns
 sys.stdout.reconfigure(encoding='utf-8')
 import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 from fastapi import FastAPI
@@ -21,6 +22,7 @@ from src.llm import LLMClient
 from src.retrieval.retriever import Retriever
 class ChatRequest(BaseModel):
   query: str
+  history: list = []
 
 
 # Bien toan cuc luu Orchestrator de dung chung cho cac request
@@ -74,12 +76,16 @@ async def chat_endpoint(request: ChatRequest):
   print(f"\n[USER]: {request.query}")
 
   # Goi ham run cua Agent
-  result = global_orchestrator.run(request.query)
+  result = global_orchestrator.run(request.query, history=request.history)
 
   return {
-    "answer": result.get("final_answer", ""),
-    "strategy": result.get("strategy", ""),
-    "retry_count": result.get("retry_count", 0),
+    "answer": result.get("final_answer") or "",
+    "strategy": result.get("strategy") or "",
+    "strategy_reason": result.get("strategy_reason") or "",
+    "reflection_reason": result.get("reflection_reason") or "",
+    "thought_process": result.get("thought_process") or [],
+    "retry_count": result.get("retry_count") or 0,
+    "search_query": result.get("search_query") or request.query,
   }
 
 os.makedirs("ui", exist_ok=True)

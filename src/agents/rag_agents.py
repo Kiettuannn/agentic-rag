@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 class RAGState(TypedDict):
   query: str 
+  history: list[dict]
+  search_query: str
   strategy: str
   strategy_reason: str
-
   documents: list[Document]
   context: str
   answer: str
@@ -32,38 +33,50 @@ class RAGNodes:
 
 
   def query_analyzer(self, state: RAGState) -> dict:
-    """
-    Analyze the query to choose suitable retrieval
-    
-    Strategy:
-    - dense: define, cause, reason question
-    - hybrid: specific keyword
-    - graph:  relationship between entities, e.g.,
-    """
     query = state["query"]
+    history = state.get("history", [])
+
+    # Gom lich su thanh 1 doan text de LLM de doc
+    history_text = "Không có lịch sử"
+    if history:
+      history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
+
     logger.info(f"[query_analyzer] Analyzing query: {query[:180]}...")
 
-    prompt = f"""Bạn là chuyên gia phân tích câu hỏi pháp lý.
-            Phân tích câu hỏi sau và chọn chiến lược tìm kiếm phù hợp nhất:
-            CÂU HỎI: {query}
-            CÁC CHIẾN LƯỢC:
-            - "dense": Tìm kiếm theo ngữ nghĩa. Dùng khi câu hỏi hỏi về ý nghĩa, khái niệm, điều kiện, quy định chung.
-              Ví dụ: "Điều kiện để được cấp phép kinh doanh là gì?"
-              
-            - "hybrid": Tìm kiếm kết hợp ngữ nghĩa + từ khóa. Dùng khi câu hỏi có tên văn bản cụ thể, số hiệu luật, điều khoản cụ thể.
-              Ví dụ: "Điều 17 Luật Đất đai 2024 quy định gì?"
-              
-            - "graph": Tìm kiếm theo mạng lưới quan hệ văn bản. Dùng khi câu hỏi về mối quan hệ giữa nhiều văn bản, hiệu lực, sửa đổi, thay thế.
-              Ví dụ: "Những văn bản nào sửa đổi bổ sung Luật Đầu tư 2020?"
-            Trả về JSON với format sau (KHÔNG thêm gì khác):
-            {{
-              "strategy": "dense" | "hybrid" | "graph",
-              "reason": "giải thích ngắn gọn tại sao chọn strategy này"
-            }}"""
+    prompt = f"""<role>
+Bạn là chuyên gia phân tích câu hỏi pháp lý.
+</role>
+
+<context>
+Dưới đây là lịch sử hội thoại gần nhất:
+{history_text}
+
+CÂU HỎI MỚI: {query}
+</context>
+
+<instruction>
+NHIỆM VỤ 1 (Query Rewriting):
+Nếu câu hỏi mới có chứa đại từ nhân xưng (ví dụ: luật đó, mức tiền này, văn bản ấy) hoặc đang hỏi nối tiếp nội dung trước đó, hãy dựa vào Lịch sử hội thoại để VIẾT LẠI câu hỏi thành một câu hoàn chỉnh, rõ nghĩa và độc lập. Nếu câu hỏi đã đầy đủ, hãy giữ nguyên.
+
+NHIỆM VỤ 2 (Strategy Selection):
+Dựa vào câu hỏi đã viết lại, chọn chiến lược:
+- "dense": hỏi về khái niệm, quy định chung.
+- "hybrid": hỏi đích danh tên văn bản, số hiệu (VD: Quyết định 105).
+- "graph": hỏi về mối quan hệ (sửa đổi, thay thế, hướng dẫn).
+
+Trả về JSON với format sau (KHÔNG thêm gì khác):
+{{
+  "search_query": "câu hỏi đã viết lại ở NV1",
+  "strategy": "dense" | "hybrid" | "graph",
+  "reason": "lý do chọn chiến lược"
+}}
+</instruction>
+    """
     
     try:
       raw = self.llm.invoke_json(prompt)
       parsed = json.loads(raw)
+      search_query = parsed.get("search_query", query)
       strategy = parsed.get("strategy", "hybrid")
       reason = parsed.get("reason", "")
 
@@ -74,26 +87,21 @@ class RAGNodes:
         reason = "Invalid strategy value returned by LLM. Defaulting to 'hybrid'."
     except (json.JSONDecodeError, Exception) as e:
       logger.error(f"[query_analyzer] Failed to parse LLM response: {e}. Defaulting to 'hybrid'.")
+      search_query = query
       strategy = "hybrid"
       reason = f"Failed to parse LLM response: {str(e)}. Defaulting to 'hybrid'."
     
     logger.info(f"[query_analyzer] Chosen strategy: {strategy}, reason: {reason}")
 
     return {
+      "search_query": search_query,
       "strategy": strategy,
       "strategy_reason": reason
     }
   
 
   def retriever_node(self, state: RAGState) -> dict:
-    """
-    Retrieval base on strategy
-    When retry, if strategy is dense, we can switch to hybrid
-    If strategy is hybrid, we can switch to graph
-    If strategy is graph -> not change
-    """
-
-    query = state["query"]
+    query = state.get("search_query", state["query"])
     strategy = state["strategy"]
     retry_count = state.get("retry_count", 0)
 
@@ -125,7 +133,7 @@ class RAGNodes:
     }
   
   def answer_node(self, state: RAGState) -> dict:
-    query = state["query"]
+    query = state.get("search_query", state["query"])
     documents = state["documents"]
 
     # Format documents into context string
