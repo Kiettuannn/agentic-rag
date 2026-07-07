@@ -81,6 +81,21 @@ def main():
             f.write(f"- [{doc.metadata.get('doc_id')}] {doc.metadata.get('title', 'No Title')}\n")
     print("\n[INFO] Đã xuất danh sách các văn bản vào file: data/mock_dataset_docs.txt")
 
+    # LƯU TOÀN BỘ NỘI DUNG VĂN BẢN RA FILE JSON ĐỂ DỄ DÀNG XEM LẠI
+    import json
+    all_docs_data = []
+    for doc in mock_docs + cleaned_real_docs:
+        all_docs_data.append({
+            "doc_id": doc.metadata.get('doc_id'),
+            "title": doc.metadata.get('title', 'No Title'),
+            "content": doc.page_content
+        })
+    with open("data/full_dataset_content.json", "w", encoding="utf-8") as f:
+        json.dump(all_docs_data, f, ensure_ascii=False, indent=4)
+    print("[INFO] Đã xuất TOÀN BỘ NỘI DUNG chi tiết vào file: data/full_dataset_content.json")
+
+
+
     # Reset (Xóa) DB cũ để không bị nhiễu quá lố
     chroma_dir = config.get("chroma", {}).get("persist_directory", "data/chroma_db")
     if os.path.exists(chroma_dir):
