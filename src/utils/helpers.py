@@ -14,8 +14,8 @@ def extract_sources(documents: list) -> list[dict]:
     for doc in documents:
         meta = doc.metadata
 
-        doc_id = meta["doc_id"]
-        if doc_id:
+        doc_id = meta.get("doc_id")
+        if not doc_id:
             continue
 
         # Deduplicate
@@ -32,5 +32,5 @@ def extract_sources(documents: list) -> list[dict]:
             "issue_date": meta.get("issue_date",""),
             "status": meta.get("status",""),
         })
-        return sources
+    return sources
 

@@ -61,7 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendMessage('bot', `**Lỗi:** ${data.error}`);
             } else {
                 // 4. Hiển thị tin nhắn của Bot (có chứa Strategy và Retry)
-                appendBotMessageWithMeta(data.answer, data.strategy, data.retry_count, data.search_query, data.strategy_reason, data.reflection_reason
+                appendBotMessageWithMeta(
+                    data.answer, data.strategy, data.retry_count, data.search_query,
+                    data.strategy_reason, data.reflection_reason, data.sources || []
                 );
 
                 chatHistory.push({ role: 'bot', content: data.answer }); // Lưu vào lịch sử chat
@@ -99,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Hàm tạo Bong bóng chat có gắn nhãn Strategy & Retry cho BOT
-    function appendBotMessageWithMeta(text, strategy, retryCount, searchQuery, strategyReason, reflectionReason) {
+    function appendBotMessageWithMeta(text, strategy, retryCount, searchQuery, strategyReason, reflectionReason, sources=[]) {
         text = text || "";
         strategy = strategy || "";
         searchQuery = searchQuery || "";
@@ -108,7 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
         div.className = `message bot-message`;
         
         const htmlContent = marked.parse(text);
-        
+        const sourcesHtml = buildSourcesHtml(sources)
+
+
         // Tạo khối Badges
         const badgesHtml = `
             <div class="meta-badges">
@@ -133,11 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
+
         div.innerHTML = `
             <div class="avatar">🤖</div>
             <div class="message-content">
                 ${badgesHtml}
                 ${thoughtsHtml}
+                ${sourcesHtml}
                 ${htmlContent}
             </div>
         `;
@@ -188,4 +194,80 @@ document.addEventListener('DOMContentLoaded', () => {
             }[tag])
         );
     }
+
+      // =====================================================================
+    // [MỚI] Hàm xây dựng HTML cho section Citations / Nguồn tham khảo
+    //
+    // @param {Array} sources - Mảng object từ API, mỗi object có dạng:
+    //   { doc_id, title, doc_type, authority, issue_date, status }
+    //
+    // @returns {string} - Chuỗi HTML hoàn chỉnh, hoặc '' nếu không có nguồn
+    // =====================================================================
+    function buildSourcesHtml(sources) {
+        // Guard: nếu không có sources hoặc mảng rỗng → không render gì cả
+        if (!sources || sources.length === 0) return '';
+
+        // Hàm nội bộ: chọn emoji icon dựa theo loại văn bản
+        // Mục đích: phân biệt trực quan giữa các loại văn bản pháp luật
+        function getDocIcon(docType) {
+            if (!docType) return '📄';
+            const type = docType.toLowerCase();
+            if (type.includes('luật'))         return '⚖️';
+            if (type.includes('nghị định'))    return '📋';
+            if (type.includes('thông tư'))     return '📝';
+            if (type.includes('quyết định'))   return '📌';
+            if (type.includes('nghị quyết'))   return '🏛️';
+            if (type.includes('chỉ thị'))      return '📢';
+            return '📄'; // fallback mặc định
+        }
+
+        // Hàm nội bộ: xác định class CSS của badge trạng thái hiệu lực
+        // Màu xanh = còn hiệu lực, màu xám = hết / không rõ
+        function getStatusClass(status) {
+            if (!status) return 'source-badge inactive';
+            const s = status.toLowerCase();
+            // Kiểm tra các từ khóa "còn hiệu lực" phổ biến trong dữ liệu pháp luật VN
+            if (s.includes('còn') || s.includes('hiệu lực') || s.includes('có hiệu lực')) {
+                return 'source-badge active';   // → màu xanh emerald
+            }
+            return 'source-badge inactive';     // → màu xám muted
+        }
+
+        // Tạo HTML cho từng source card
+        // Dùng escapeHTML() (đã có sẵn trong app.js) để tránh XSS
+        const cardsHtml = sources.map(src => {
+            const icon       = getDocIcon(src.doc_type);
+            const statusClass = getStatusClass(src.status);
+            const title      = escapeHTML(src.title || src.doc_id || 'Không rõ tên');
+            const authority  = escapeHTML(src.authority || '');
+            const issueDate  = escapeHTML(src.issue_date || '');
+            const status     = escapeHTML(src.status || 'Không rõ');
+
+            // Tạo dòng meta: "Cơ quan · Ngày" (bỏ qua nếu field rỗng)
+            const metaParts = [authority, issueDate].filter(Boolean);
+            const metaText  = metaParts.join(' · ');
+
+            return `
+                <div class="source-card">
+                    <div class="source-icon">${icon}</div>
+                    <div class="source-info">
+                        <div class="source-title">${title}</div>
+                        ${metaText ? `<div class="source-meta">${metaText}</div>` : ''}
+                    </div>
+                    <span class="${statusClass}">${status}</span>
+                </div>
+            `;
+        }).join('');
+
+        // Render toàn bộ section citations
+        return `
+            <div class="sources-section">
+                <div class="sources-label">📎 Nguồn tham khảo (${sources.length} văn bản)</div>
+                <div class="sources-list">
+                    ${cardsHtml}
+                </div>
+            </div>
+        `;
+    }
 });
+

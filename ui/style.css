@@ -345,3 +345,114 @@ textarea::placeholder {
 .thought-content strong {
     color: #e2e8f0;
 }
+
+/* =====================================================================
+   [MỚI] Citations / Nguồn tham khảo
+   Nằm dưới thought-process và trên nội dung câu trả lời chính.
+   Design: nhất quán với dark glassmorphism theme hiện tại.
+   ===================================================================== */
+
+/* Container bao toàn bộ phần citations */
+.sources-section {
+    margin-bottom: 16px;                         /* Khoảng cách với câu trả lời bên dưới */
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.15);            /* Nền tối nhẹ, phân biệt với message content */
+    border: 1px dashed rgba(255, 255, 255, 0.12); /* Border kiểu dashed, giống thought-process */
+    border-radius: 8px;
+}
+
+/* Tiêu đề "📎 Nguồn tham khảo (N văn bản)" */
+.sources-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #9ca3af;                              /* Màu muted, không lấn át câu trả lời */
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+/* Flex container của các card — wrap khi nhiều card */
+.sources-list {
+    display: flex;
+    flex-direction: column;                      /* Stack dọc, mỗi card chiếm 1 hàng */
+    gap: 8px;
+}
+
+/* Card hiển thị 1 văn bản nguồn */
+.source-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);       /* Glassmorphism rất nhẹ */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    transition: border-color 0.2s ease,
+                background  0.2s ease;           /* Smooth hover transition */
+    cursor: default;                             /* Không có link → không dùng pointer */
+}
+
+/* Hover effect — highlight nhẹ để user biết card tương tác được */
+.source-card:hover {
+    background: rgba(59, 130, 246, 0.06);        /* Tint màu xanh blueprint rất nhẹ */
+    border-color: rgba(59, 130, 246, 0.3);       /* Border xanh rõ hơn */
+}
+
+/* Emoji icon loại văn bản (⚖️ 📋 📝...) */
+.source-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;                              /* Không co lại khi title dài */
+    line-height: 1;
+}
+
+/* Flex column chứa title và meta */
+.source-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;                                     /* Chiếm hết không gian còn lại */
+    min-width: 0;                                /* Cho phép text-overflow hoạt động */
+}
+
+/* Tên văn bản */
+.source-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #e5e7eb;                              /* Gần trắng, dễ đọc */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;                     /* Cắt "..." nếu tên quá dài */
+}
+
+/* Cơ quan · Ngày ban hành */
+.source-meta {
+    font-size: 0.75rem;
+    color: #6b7280;                              /* Xám nhạt, thông tin phụ */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Badge trạng thái hiệu lực — dùng chung, phân biệt qua class .active / .inactive */
+.source-badge {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    white-space: nowrap;                         /* Badge không wrap xuống dòng */
+    flex-shrink: 0;
+}
+
+/* Còn hiệu lực → màu xanh emerald (nhất quán với màu status "Online" ở header) */
+.source-badge.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+/* Hết / không rõ hiệu lực → màu xám muted */
+.source-badge.inactive {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+    border: 1px solid rgba(107, 114, 128, 0.3);
+}

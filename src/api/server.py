@@ -1,6 +1,8 @@
 import os
 import sys
 
+from src.utils.helpers import extract_sources
+
 # Tat log rac va sua loi font tieng viet tren terminal windowns
 sys.stdout.reconfigure(encoding='utf-8')
 import logging
@@ -86,6 +88,7 @@ async def chat_endpoint(request: ChatRequest):
     "thought_process": result.get("thought_process") or [],
     "retry_count": result.get("retry_count") or 0,
     "search_query": result.get("search_query") or request.query,
+    "sources": extract_sources(result.get("documents") or [])
   }
 
 os.makedirs("ui", exist_ok=True)
