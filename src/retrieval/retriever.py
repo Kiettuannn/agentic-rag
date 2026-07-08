@@ -36,12 +36,15 @@ class Retriever:
   def retrieve(
       self,
       query: str,
-      strategy: str = "dense",
+      strategy: str = "hybrid",
       k: int = 5,
   ) -> list[Document]:
     
     if strategy == "dense":
       return dense_search(store=self.store, query=query, k=k)
+
+    elif strategy == "bm25":
+      return self.bm25_index.search(query=query, k=k)
     
     elif strategy == "hybrid":
       return hybrid_search(store=self.store, bm25_index=self.bm25_index, query=query, k=k)
@@ -55,5 +58,5 @@ class Retriever:
         bm25_index=self.bm25_index
       )
     
-    raise ValueError(f"Invalid retrieval strategy: {strategy}. Must be one of ['dense', 'hybrid', 'graph'].")
+    raise ValueError(f"Invalid retrieval strategy: {strategy}. Must be one of ['dense', 'hybrid', 'graph', 'bm25'].")
     

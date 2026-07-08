@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 4. Hiển thị tin nhắn của Bot (có chứa Strategy và Retry)
                 appendBotMessageWithMeta(
                     data.answer, data.strategy, data.retry_count, data.search_query,
-                    data.strategy_reason, data.reflection_reason, data.sources || []
+                    data.strategy_reason, data.reflection_reason, data.sources || [], data.agent_logs || []
                 );
 
                 chatHistory.push({ role: 'bot', content: data.answer }); // Lưu vào lịch sử chat
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Hàm tạo Bong bóng chat có gắn nhãn Strategy & Retry cho BOT
-    function appendBotMessageWithMeta(text, strategy, retryCount, searchQuery, strategyReason, reflectionReason, sources=[]) {
+    function appendBotMessageWithMeta(text, strategy, retryCount, searchQuery, strategyReason, reflectionReason, sources=[], agentLogs=[]) {
         text = text || "";
         strategy = strategy || "";
         searchQuery = searchQuery || "";
@@ -124,14 +124,26 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
+        let terminalBoxHtml = '';
+        if (agentLogs && agentLogs.length > 0) {
+            const logsStr = agentLogs.map(log => escapeHTML(log)).join('<br>');
+            terminalBoxHtml = `
+                <div class="terminal-box">
+                    <div class="terminal-header">Terminal Log</div>
+                    <div class="terminal-body">${logsStr}</div>
+                </div>
+            `;
+        }
+
         let thoughtsHtml = '';
-        if (strategyReason || reflectionReason) {
+        if (strategyReason || reflectionReason || terminalBoxHtml) {
             thoughtsHtml = `
                 <details class="thought-process">
                     <summary class="thought-summary">🔍 Nhấn để xem quá trình phân tích...</summary>
                     <div class="thought-content">
                         ${strategyReason ? `<strong>Phân tích Chiến lược:</strong><br>${escapeHTML(strategyReason)}<br><br>` : ''}
-                        ${reflectionReason ? `<strong>Trạm kiểm duyệt (Reflection):</strong><br>${escapeHTML(reflectionReason)}` : ''}
+                        ${terminalBoxHtml}
+                        ${reflectionReason ? `<br><strong>Trạm kiểm duyệt (Reflection):</strong><br>${escapeHTML(reflectionReason)}` : ''}
                     </div>
                 </details>
             `;

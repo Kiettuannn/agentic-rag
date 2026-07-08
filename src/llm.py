@@ -6,6 +6,7 @@ import ast
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -192,4 +193,13 @@ class _LLMResponse:
 
   def __repr__(self):
     return f"_LLMResponse(content={self.content[:100]!r}...)"
-  
+
+
+def create_langchain_llm(config: dict = None) -> ChatOpenAI:
+  """Create ChatOpenAI instance for tool calling"""
+  return ChatOpenAI(
+    base_url = os.getenv("LLM_BASE_URL"),
+    api_key=os.getenv("LLM_API_KEY"),
+    model=os.getenv("LLM_MODEL", ""),
+    temperature=0.1,
+  )
