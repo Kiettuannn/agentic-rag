@@ -59,7 +59,7 @@ CÂU HỎI MỚI: {query}
 
 <instruction>
 NHIỆM VỤ 1 (Query Rewriting):
-Nếu câu hỏi mới có chứa đại từ nhân xưng (ví dụ: luật đó, mức tiền này, văn bản ấy) hoặc đang hỏi nối tiếp nội dung trước đó, hãy dựa vào Lịch sử hội thoại để VIẾT LẠI câu hỏi thành một câu hoàn chỉnh, rõ nghĩa và độc lập. Nếu câu hỏi đã đầy đủ, hãy giữ nguyên.
+Nếu câu hỏi mới có chứa đại từ nhân xưng (ví dụ: luật đó, mức tiền này, văn bản ấy) hoặc đang hỏi nối tiếp nội dung trước đó, hãy dựa vào Lịch sử hội thoại (nếu có) để VIẾT LẠI câu hỏi thành một câu hoàn chỉnh, rõ nghĩa và độc lập. Nếu câu hỏi đã đầy đủ, hãy giữ nguyên.
 
 NHIỆM VỤ 2 (Strategy Selection):
 Dựa vào câu hỏi đã viết lại, chọn chiến lược tra cứu theo các quy tắc nghiêm ngặt sau:
@@ -109,37 +109,7 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
     }
   
 
-  # def retriever_node(self, state: RAGState) -> dict:
-  #   query = state.get("search_query", state["query"])
-  #   strategy = state["strategy"]
-  #   retry_count = state.get("retry_count", 0)
-  #
-  #   if retry_count > 0:
-  #     escalation_map ={
-  #       "dense": "hybrid",
-  #       "hybrid": "graph",
-  #       "graph": "graph"
-  #     }
-  #     new_strategy = escalation_map.get(strategy, "hybrid")
-  #     if new_strategy != strategy:
-  #       logger.info(
-  #           f"[retriever_node] Retry {retry_count}: "
-  #           f"escalating {strategy} -> {new_strategy}"
-  #         )
-  #       strategy = new_strategy
-  #   logger.info(f"[retriever_node] Using strategy: {strategy}")
-  #
-  #   documents = self.retriever.retrieve(
-  #     query=query,
-  #     strategy=strategy,
-  #     k=5
-  #   )
-  #
-  #   logger.info(f"[retriever_node] Retrieved {len(documents)} documents")
-  #   return {
-  #     "strategy": strategy,
-  #     "documents": documents
-  #   }
+
   def agent_node(self, state: RAGState) -> dict:
     messages = state.get("messages", [])
     search_query = state.get("search_query", state["query"])
@@ -185,15 +155,14 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
     return {"messages": messages + new_messages}
 
   def route_after_agent(self, state: RAGState) -> Literal["tool_node", "answer_node"]:
-    """Điều hướng: Nếu LLM chọn tool thì sang tool_node, không thì sang answer_node."""
     messages = state.get("messages", [])
     last_message = messages[-1]
     
-    # Đếm số lần đã nhận kết quả từ tool
+
     tool_calls_count = sum(1 for m in messages if isinstance(m, ToolMessage))
     
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-      # Giới hạn tối đa 3 lần gọi tool để tránh lặp vô hạn
+
       if tool_calls_count >= 3:
         logger.warning(f"[route_after_agent] LLM đang bị kẹt vòng lặp (đã thử {tool_calls_count} lần). Ép dừng!")
         return "answer_node"
@@ -230,8 +199,6 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
     response = self.llm.invoke(prompt)
     answer = response.content
     try:
-      # [FIX] Lấy chính xác query mà LLM đã bóc tách đưa vào Tool để retrieve lại
-      # Nếu không, truyền cả câu dài vào BM25 sẽ làm nhiễu kết quả Citations.
       retrieve_query = query
       for msg in messages:
         if hasattr(msg, "tool_calls") and msg.tool_calls:
@@ -248,8 +215,6 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
       "documents": docs_for_citations
     }
 
-
-  
   def reflection_node(self, state: RAGState) -> dict:
     query = state["query"]
     answer = state["answer"]
@@ -296,8 +261,6 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
       "reflection": verdict,
       "reflection_reason": reason
     }
-
-
 
   def finalize_node(self, state: RAGState) -> dict:
     return {

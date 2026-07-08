@@ -58,8 +58,8 @@ async def lifespan(app: FastAPI):
 
   # Khoi tao Retriever va LLM
   print("Dang khoi tao Retriever va LLM ...")
-  retriever = Retriever(store=store, bm25_index=bm25, graph=graph)  # [SỬA] khởi tạo retriever trước
-  llm = LLMClient.from_config(config)                               # [SỬA] gọi classmethod đúng cách
+  retriever = Retriever(store=store, bm25_index=bm25, graph=graph)
+  llm = LLMClient.from_config(config)
 
   # Khởi tạo ChatOpenAI mới và Tools
   langchain_llm = create_langchain_llm(config)
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
 
   # Khoi tao Orchestrator
   global_orchestrator = RAGOrchestrator(
-    retriever=retriever,          # [SỬA] thêm lại retriever bị thiếu
+    retriever=retriever,
     llm=llm,
     langchain_llm=langchain_llm,
     tools=tools
