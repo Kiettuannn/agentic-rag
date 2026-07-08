@@ -8,11 +8,12 @@ from langchain_core.documents import Document
 
 from src.retrieval.retriever import Retriever
 from src.llm import LLMClient
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 logger = logging.getLogger(__name__)
 
 class RAGState(TypedDict):
-  query: str 
+  query: str
   history: list[dict]
   search_query: str
   strategy: str
@@ -24,12 +25,14 @@ class RAGState(TypedDict):
   reflection_reason: str
   retry_count: int
   final_answer: str
-
+  messages: list  # Lưu hội thoại giữa Agent và Tool (AIMessage, ToolMessage...)
 
 class RAGNodes:
-  def __init__(self, retriever: Retriever, llm: LLMClient):
+  def __init__(self, retriever: Retriever, llm: LLMClient, langchain_llm, tools: list):
     self.retriever = retriever
     self.llm = llm
+    self.agent_llm = langchain_llm.bind_tools(tools)
+    self.tools_map = {t.name: t for t in tools}
 
 
   def query_analyzer(self, state: RAGState) -> dict:
@@ -59,15 +62,21 @@ NHIỆM VỤ 1 (Query Rewriting):
 Nếu câu hỏi mới có chứa đại từ nhân xưng (ví dụ: luật đó, mức tiền này, văn bản ấy) hoặc đang hỏi nối tiếp nội dung trước đó, hãy dựa vào Lịch sử hội thoại để VIẾT LẠI câu hỏi thành một câu hoàn chỉnh, rõ nghĩa và độc lập. Nếu câu hỏi đã đầy đủ, hãy giữ nguyên.
 
 NHIỆM VỤ 2 (Strategy Selection):
-Dựa vào câu hỏi đã viết lại, chọn chiến lược:
-- "dense": hỏi về khái niệm, quy định chung.
-- "hybrid": hỏi đích danh tên văn bản, số hiệu (VD: Quyết định 105).
-- "graph": hỏi về mối quan hệ (sửa đổi, thay thế, hướng dẫn).
+Dựa vào câu hỏi đã viết lại, chọn chiến lược tra cứu theo các quy tắc nghiêm ngặt sau:
 
+1. "bm25": LÀ CÔNG CỤ TRA CỨU ĐÍCH DANH. Dùng KHI VÀ CHỈ KHI user muốn tìm hiểu tổng quan, xem hoặc tải một văn bản cụ thể dựa trên số hiệu/tên riêng. 
+   -> Ví dụ: "Quyết định 52/2009 quy định về cái gì?", "Cho tôi xem Nghị định 100", "Luật Doanh nghiệp 2020".
+
+2. "graph": LÀ CÔNG CỤ TÌM QUAN HỆ. Dùng khi hỏi về sự liên kết giữa các văn bản.
+   -> Ví dụ: "Văn bản nào sửa đổi Quyết định 52?", "Nghị định này thay thế cho luật nào?".
+
+3. "hybrid": LÀ CÔNG CỤ TRA CỨU TÌNH HUỐNG/KHÁI NIỆM. Dùng cho TẤT CẢ các trường hợp còn lại. Đặc biệt: Kể cả khi user có nhắc đến số hiệu văn bản, nhưng lại hỏi kèm MỘT TÌNH HUỐNG hoặc VẤN ĐỀ CỤ THỂ, thì BẮT BUỘC dùng hybrid.
+   -> Ví dụ: "Thế nào là tài sản công?" (Hỏi khái niệm -> hybrid)
+   -> Ví dụ: "Theo Nghị định 100, vượt đèn đỏ phạt bao nhiêu?" (Có nhắc NĐ 100 nhưng hỏi tình huống cụ thể "vượt đèn đỏ" -> Bắt buộc dùng hybrid để bắt được ngữ nghĩa).
 Trả về JSON với format sau (KHÔNG thêm gì khác):
 {{
   "search_query": "câu hỏi đã viết lại ở NV1",
-  "strategy": "dense" | "hybrid" | "graph",
+  "strategy": "hybrid" | "bm25" | "graph",
   "reason": "lý do chọn chiến lược"
 }}
 </instruction>
@@ -81,7 +90,7 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
       reason = parsed.get("reason", "")
 
       # Validate strategy value
-      if strategy not in ["dense", "hybrid", "graph"]:
+      if strategy not in ["bm25", "hybrid", "graph"]:
         logger.warning(f"[query_analyzer] Invalid strategy value: {strategy}. Defaulting to 'hybrid'.")
         strategy = "hybrid"
         reason = "Invalid strategy value returned by LLM. Defaulting to 'hybrid'."
@@ -100,81 +109,146 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
     }
   
 
-  def retriever_node(self, state: RAGState) -> dict:
-    query = state.get("search_query", state["query"])
-    strategy = state["strategy"]
-    retry_count = state.get("retry_count", 0)
+  # def retriever_node(self, state: RAGState) -> dict:
+  #   query = state.get("search_query", state["query"])
+  #   strategy = state["strategy"]
+  #   retry_count = state.get("retry_count", 0)
+  #
+  #   if retry_count > 0:
+  #     escalation_map ={
+  #       "dense": "hybrid",
+  #       "hybrid": "graph",
+  #       "graph": "graph"
+  #     }
+  #     new_strategy = escalation_map.get(strategy, "hybrid")
+  #     if new_strategy != strategy:
+  #       logger.info(
+  #           f"[retriever_node] Retry {retry_count}: "
+  #           f"escalating {strategy} -> {new_strategy}"
+  #         )
+  #       strategy = new_strategy
+  #   logger.info(f"[retriever_node] Using strategy: {strategy}")
+  #
+  #   documents = self.retriever.retrieve(
+  #     query=query,
+  #     strategy=strategy,
+  #     k=5
+  #   )
+  #
+  #   logger.info(f"[retriever_node] Retrieved {len(documents)} documents")
+  #   return {
+  #     "strategy": strategy,
+  #     "documents": documents
+  #   }
+  def agent_node(self, state: RAGState) -> dict:
+    messages = state.get("messages", [])
+    search_query = state.get("search_query", state["query"])
+    suggested_strategy = state.get("strategy", "hybrid")
 
-    if retry_count > 0:
-      escalation_map ={
-        "dense": "hybrid",
-        "hybrid": "graph",
-        "graph": "graph"
-      }
-      new_strategy = escalation_map.get(strategy, "hybrid")
-      if new_strategy != strategy:
-        logger.info(
-            f"[retriever_node] Retry {retry_count}: "
-            f"escalating {strategy} -> {new_strategy}"
-          )
-        strategy = new_strategy
-    logger.info(f"[retriever_node] Using strategy: {strategy}")
+    if not messages:
+      system_prompt = f"""Bạn là trợ lý pháp lý. Bạn có các công cụ tra cứu:
+      - aggregate_search (Hybrid - MẶC ĐỊNH, dùng cho khái niệm, quy định chung)
+      - keyword_search (BM25 - chỉ dùng khi có số hiệu chính xác)
+      - related_document_search (Graph - cho quan hệ sửa đổi, thay thế)
+      Hệ thống phân tích trước đó GỢI Ý bạn nên dùng chiến lược: '{suggested_strategy}'.
+      (Lưu ý: 'hybrid' ~ tìm tổng hợp, 'bm25' ~ tìm chính xác, 'graph' ~ tìm liên quan).
+      Hãy tôn trọng gợi ý này để chọn tool phù hợp nhất."""
 
-    documents = self.retriever.retrieve(
-      query=query,
-      strategy=strategy,
-      k=5
-    )
+      messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=search_query),
+      ]
+    logger.info(f"[agent_node] Invoking Tool-calling LLM...")
+    response = self.agent_llm.invoke(messages)
+    return {"messages": messages + [response]}
 
-    logger.info(f"[retriever_node] Retrieved {len(documents)} documents")
-    return {
-      "strategy": strategy,
-      "documents": documents
-    }
+  def tool_node(self, state: RAGState) -> dict:
+    messages = state["messages"]
+    last_message = messages[-1]
+    new_messages = []
+    for tool_call in last_message.tool_calls:
+      tool_name = tool_call["name"]
+      tool_args = tool_call["args"]
+      tool_id = tool_call["id"]
+      logger.info(f"[tool_node] Executing: {tool_name}({tool_args})")
+      tool_fn = self.tools_map.get(tool_name)
+
+      if tool_fn:
+        try:
+          result_str = tool_fn.invoke(tool_args)
+        except Exception as e:
+          result_str = f"Lỗi thực thi: {str(e)}"
+      else:
+        result_str = "Lỗi: Không tìm thấy tool."
+
+      new_messages.append(ToolMessage(content=result_str, tool_call_id=tool_id))
+    return {"messages": messages + new_messages}
+
+  def route_after_agent(self, state: RAGState) -> Literal["tool_node", "answer_node"]:
+    """Điều hướng: Nếu LLM chọn tool thì sang tool_node, không thì sang answer_node."""
+    messages = state.get("messages", [])
+    last_message = messages[-1]
+    
+    # Đếm số lần đã nhận kết quả từ tool
+    tool_calls_count = sum(1 for m in messages if isinstance(m, ToolMessage))
+    
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+      # Giới hạn tối đa 3 lần gọi tool để tránh lặp vô hạn
+      if tool_calls_count >= 3:
+        logger.warning(f"[route_after_agent] LLM đang bị kẹt vòng lặp (đã thử {tool_calls_count} lần). Ép dừng!")
+        return "answer_node"
+      return "tool_node"
+    return "answer_node"
+
+
   
   def answer_node(self, state: RAGState) -> dict:
     query = state.get("search_query", state["query"])
-    documents = state["documents"]
 
-    # Format documents into context string
-    context_parts = []
-    for doc in documents:
-      doc_id = doc.metadata.get("doc_id", "unknown")
-      title = doc.metadata.get("title", "")
-      chunk_idx = doc.metadata.get("chunk_index", -1)
+    messages = state.get("messages", [])
 
-      context_parts.append(
-        f"[van ban: {doc_id} | {title} | chunk {chunk_idx}]\n"
-        f"{doc.page_content}"
-      )
-    
-    context = "\n\n---\n\n".join(context_parts)
+    tool_results = [m for m in messages if isinstance(m, ToolMessage)]
+    context = "\n\n---\n\n".join([m.content for m in tool_results])
 
     if not context.strip():
       return {
         "context": "",
-        "answer": "Không tìm thấy tài liệu liên quan để trả lời câu hỏi này.",
+        "answer": "Không tìm thấy tài liệu liên quan để trả lời.",
+        "documents": []
       }
+
     prompt = f"""Bạn là trợ lý pháp lý chuyên về văn bản pháp luật Việt Nam.
-              NGUYÊN TẮC:
-              - Chỉ trả lời dựa trên context được cung cấp bên dưới
-              - Trích dẫn số hiệu văn bản, điều khoản cụ thể khi có thể
-              - Nếu context không đủ thông tin, nói rõ "Không tìm thấy đủ căn cứ"
-              - Không bịa đặt thông tin
-              CONTEXT:
-              {context}
-              CÂU HỎI:
-              {query}
-              TRẢ LỜI:"""
+    NGUYÊN TẮC:
+    - Chỉ trả lời dựa trên context được cung cấp
+    - Trích dẫn số hiệu cụ thể
+    CONTEXT:
+    {context}
+    CÂU HỎI:
+    {query}
+    TRẢ LỜI:"""
+
     response = self.llm.invoke(prompt)
     answer = response.content
-
-    logger.info(f"[answer_node] Generated answer (length {len(answer)}) chars")
+    try:
+      # [FIX] Lấy chính xác query mà LLM đã bóc tách đưa vào Tool để retrieve lại
+      # Nếu không, truyền cả câu dài vào BM25 sẽ làm nhiễu kết quả Citations.
+      retrieve_query = query
+      for msg in messages:
+        if hasattr(msg, "tool_calls") and msg.tool_calls:
+          last_args = msg.tool_calls[-1].get("args", {})
+          retrieve_query = last_args.get("keyword") or last_args.get("question") or query
+          
+      docs_for_citations = self.retriever.retrieve(query=retrieve_query, strategy=state["strategy"], k=5)
+    except:
+      docs_for_citations = []
 
     return {
       "context": context,
-      "answer": answer
+      "answer": answer,
+      "documents": docs_for_citations
     }
+
+
   
   def reflection_node(self, state: RAGState) -> dict:
     query = state["query"]

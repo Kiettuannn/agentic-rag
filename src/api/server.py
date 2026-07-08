@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from langchain_core.messages import AIMessage, ToolMessage
 
 from configs.setting import load_config
 from src.indexing.chroma_store import ChromaStore
@@ -22,6 +23,9 @@ from src.retrieval.graph import build_graph
 from src.agents.orchestrator import RAGOrchestrator
 from src.llm import LLMClient
 from src.retrieval.retriever import Retriever
+from src.llm import create_langchain_llm
+from src.tools.retrieval_tools import create_retrieval_tools
+
 class ChatRequest(BaseModel):
   query: str
   history: list = []
@@ -54,11 +58,20 @@ async def lifespan(app: FastAPI):
 
   # Khoi tao Retriever va LLM
   print("Dang khoi tao Retriever va LLM ...")
-  retriever = Retriever(store=store, bm25_index=bm25, graph=graph)
-  llm = LLMClient().from_config(config)
+  retriever = Retriever(store=store, bm25_index=bm25, graph=graph)  # [SỬA] khởi tạo retriever trước
+  llm = LLMClient.from_config(config)                               # [SỬA] gọi classmethod đúng cách
+
+  # Khởi tạo ChatOpenAI mới và Tools
+  langchain_llm = create_langchain_llm(config)
+  tools = create_retrieval_tools(store=store, bm25_index=bm25, graph=graph)
 
   # Khoi tao Orchestrator
-  global_orchestrator = RAGOrchestrator(retriever=retriever, llm=llm)
+  global_orchestrator = RAGOrchestrator(
+    retriever=retriever,          # [SỬA] thêm lại retriever bị thiếu
+    llm=llm,
+    langchain_llm=langchain_llm,
+    tools=tools
+  )
   print("SERVER DA SAN SANG TAI CONG 8000")
 
   yield
@@ -80,6 +93,19 @@ async def chat_endpoint(request: ChatRequest):
   # Goi ham run cua Agent
   result = global_orchestrator.run(request.query, history=request.history)
 
+  # Trích xuất Agent Logs (Quá trình gọi Tool)
+  agent_logs = []
+  messages = result.get("messages", [])
+  for msg in messages:
+      if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+          for tc in msg.tool_calls:
+              # Format tham số arguments cho đẹp
+              args_str = ", ".join([f"{k}='{v}'" for k, v in tc["args"].items()])
+              agent_logs.append(f"> Đang gọi công cụ: {tc['name']}({args_str})")
+      elif isinstance(msg, ToolMessage):
+          doc_len = len(msg.content)
+          agent_logs.append(f"  └─ Đã nhận kết quả ({doc_len} ký tự).")
+
   return {
     "answer": result.get("final_answer") or "",
     "strategy": result.get("strategy") or "",
@@ -88,7 +114,8 @@ async def chat_endpoint(request: ChatRequest):
     "thought_process": result.get("thought_process") or [],
     "retry_count": result.get("retry_count") or 0,
     "search_query": result.get("search_query") or request.query,
-    "sources": extract_sources(result.get("documents") or [])
+    "sources": extract_sources(result.get("documents") or []),
+    "agent_logs": agent_logs
   }
 
 os.makedirs("ui", exist_ok=True)
