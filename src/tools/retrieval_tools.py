@@ -39,7 +39,6 @@ def create_retrieval_tools(store, bm25_index, graph):
         """
         Tìm kiếm chính xác tài liệu pháp luật theo từ khóa / số hiệu.
         CHỈ DÙNG khi user hỏi ĐÍCH DANH số hiệu văn bản (Ví dụ: 'Nghị định 105', 'Luật Doanh nghiệp').
-        Không dùng cho câu hỏi khái niệm.
         """
         docs = bm25_index.search(query=keyword, k=k)
         return _format_docs(docs)
