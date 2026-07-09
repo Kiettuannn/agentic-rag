@@ -48,7 +48,7 @@ def create_retrieval_tools(store, bm25_index, graph):
         Tìm kiếm văn bản có mối quan hệ (sửa đổi, thay thế, hướng dẫn thi hành).
         Dùng khi hỏi "Luật nào sửa đổi Nghị định X?".
         """
-        docs = graph_search(store=store, query=question, k=k, bm25_index=bm25_index)
+        docs = graph_search(store=store, query=question, k=k, bm25_index=bm25_index, neo4j_driver=graph)
         return _format_docs(docs)
 
     return [aggregate_search, keyword_search, related_document_search]

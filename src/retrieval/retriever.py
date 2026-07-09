@@ -27,11 +27,11 @@ class Retriever:
     self,
     store: ChromaStore,
     bm25_index: BM25Index,
-    graph: nx.Graph,
+    neo4j_driver,
   ):
     self.store = store
     self.bm25_index = bm25_index
-    self.graph = graph
+    self.neo4j_driver = neo4j_driver
   
   def retrieve(
       self,
@@ -52,11 +52,10 @@ class Retriever:
     elif strategy == "graph":
       return graph_search(
         store=self.store,
-        graph=self.graph,
+        neo4j_driver=self.neo4j_driver,
         query=query,
         k=k,
         bm25_index=self.bm25_index
       )
-    
     raise ValueError(f"Invalid retrieval strategy: {strategy}. Must be one of ['dense', 'hybrid', 'graph', 'bm25'].")
     

@@ -1,5 +1,3 @@
-
-
 import pandas as pd
 from typing import List, Optional
 from datasets import load_dataset
@@ -77,9 +75,6 @@ def load_relationships(
     config: dict,
     sample_size: Optional[int] = None,
 ) -> list[dict]:
-    """
-    Load quan hệ giữa các văn bản pháp luật.
-    """
 
     dataset_name = config["dataset"]["name"]
 

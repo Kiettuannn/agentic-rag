@@ -40,3 +40,5 @@ tqdm>=4.0.0
 fastapi>=0.100.0
 unicorn>=0.23.0
 pydantic>=2.0.0
+
+neo4j>=5.14.1

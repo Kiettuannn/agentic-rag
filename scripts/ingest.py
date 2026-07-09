@@ -1,18 +1,4 @@
-"""
-Ingestion script có Graph-Content alignment.
 
-Vấn đề cũ:
-  - load_documents(sample_size=20) → random 20 docs
-  - load_relationships(sample_size=100) → 100 relationships của doc khác
-  - Kết quả: graph nodes KHÔNG overlap với content index → graph search vô dụng
-
-Giải pháp:
-  1. Load relationships trước → lấy tập doc_ids trong graph
-  2. Load content → filter chỉ lấy docs có doc_id trong graph
-  3. Index content đã filter → graph và content đảm bảo overlap 100%
-
-Chạy: python -m scripts.ingest
-"""
 from __future__ import annotations
 
 from dotenv import load_dotenv

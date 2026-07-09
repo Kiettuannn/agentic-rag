@@ -56,73 +56,26 @@ def normalize_relation(rel: str) -> tuple[str, bool]:
   return REL_MAP.get(rel, ("unknown", False))
 
 
-def build_graph(relationships: Iterable[dict]) -> nx.DiGraph:
-  G = nx.DiGraph()
+def expand_neighbors(driver, seed_ids: list[str], max_hops: int = 2) -> set[str]:
+    if not seed_ids:
+        return set()
+    # Cyber query
+    query = f"""
+        MATCH (seed:Document)
+        WHERE seed.doc_id IN $seed_ids
+        MATCH (seed)-[*1..{max_hops}]-(neighbor:Document)
+        RETURN DISTINCT neighbor.doc_id AS id
+        """
+    with driver.session() as session:
+        result = session.run(query, seed_ids=list(seed_ids))
+        expanded = {record["id"] for record in result}
 
-  for row in relationships:
-    source = row.get("doc_id", "")
-    target = row.get("other_doc_id", "")
-    raw_rel = row.get("relationship", "")
-
-    if not source or not target:
-      continue
-    rel_type, reverse = normalize_relation(raw_rel)
-
-    if reverse:
-      source, target = target, source
-    
-    G.add_node(source)
-    G.add_node(target)
-
-    G.add_edge(
-      source,
-      target,
-      type=rel_type,
-      raw_type=raw_rel
-    )
-  return G
-
-
-def expand_neighbors(
-    graph: nx.DiGraph,
-    seed_ids: set[str],
-    max_hops: int = 2
-) -> set[str]:
-  """
-  Expand seed documents using bidirectional BFS
-
-  Return: Set of related document IDS
-  """
-
-  visited = set(seed_ids)
-  frontier = set(seed_ids)
-
-  for _ in range(max_hops):
-    next_frontier = set()
-
-    for node in frontier:
-      if node not in graph:
-        continue
-
-      out_neighbors = set(graph.successors(node))
-      in_neighbors = set(graph.predecessors(node))
-
-      neighbors = out_neighbors | in_neighbors
-
-      for neighbor in neighbors:
-        if neighbor not in visited:
-          next_frontier.add(neighbor)
-
-    visited.update(next_frontier)
-    frontier = next_frontier
-
-    if not frontier:
-      break
-  return visited
+    expanded.update(seed_ids)
+    return expanded
 
 def graph_search(
   store,
-  graph: nx.DiGraph,
+  neo4j_driver,
   query: str,
   k: int = 5,
   initial_k: int = 3,
@@ -147,7 +100,7 @@ def graph_search(
   }
 
   # Step 3: Expand graph neighbors
-  expanded_doc_ids = expand_neighbors(graph, seed_doc_ids, max_hops=max_hops)
+  expanded_doc_ids = expand_neighbors(neo4j_driver, seed_doc_ids, max_hops=max_hops)
 
   # Step 4: Retrieve related chunks
   all_docs = []

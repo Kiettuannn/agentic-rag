@@ -19,12 +19,17 @@ from configs.setting import load_config
 from src.indexing.chroma_store import ChromaStore
 from src.indexing.bm25_index import BM25Index
 from src.ingestion.loader import load_relationships
-from src.retrieval.graph import build_graph
 from src.agents.orchestrator import RAGOrchestrator
 from src.llm import LLMClient
 from src.retrieval.retriever import Retriever
 from src.llm import create_langchain_llm
 from src.tools.retrieval_tools import create_retrieval_tools
+from neo4j import GraphDatabase
+from dotenv import load_dotenv
+
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 class ChatRequest(BaseModel):
   query: str
@@ -52,18 +57,17 @@ async def lifespan(app: FastAPI):
   bm25.load()
   print("Da tai xong BM25 Index")
 
-  relationships = load_relationships(config=config)
-  graph = build_graph(relationships)
-  print("Da tai xong Knowledgge Graph")
+  print("Connecting to Neo4j...")
+  neo4j_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
   # Khoi tao Retriever va LLM
   print("Dang khoi tao Retriever va LLM ...")
-  retriever = Retriever(store=store, bm25_index=bm25, graph=graph)
+  retriever = Retriever(store=store, bm25_index=bm25, neo4j_driver=neo4j_driver)
   llm = LLMClient.from_config(config)
 
   # Khởi tạo ChatOpenAI mới và Tools
   langchain_llm = create_langchain_llm(config)
-  tools = create_retrieval_tools(store=store, bm25_index=bm25, graph=graph)
+  tools = create_retrieval_tools(store=store, bm25_index=bm25, graph=neo4j_driver)
 
   # Khoi tao Orchestrator
   global_orchestrator = RAGOrchestrator(
@@ -77,6 +81,7 @@ async def lifespan(app: FastAPI):
   yield
 
   print("Dang tat server ...")
+  neo4j_driver.close()
 
 
 # Khoi tao FastAPI app
@@ -93,7 +98,6 @@ async def chat_endpoint(request: ChatRequest):
   # Goi ham run cua Agent
   result = global_orchestrator.run(request.query, history=request.history)
 
-  # Trích xuất Agent Logs (Quá trình gọi Tool)
   agent_logs = []
   messages = result.get("messages", [])
   for msg in messages:
