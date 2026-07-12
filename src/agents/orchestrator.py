@@ -17,6 +17,8 @@ def build_rag_graph(
   graph = StateGraph(RAGState)
 
   # Register nodes
+  graph.add_node("intent_router", nodes.intent_router)
+  graph.add_node("bypass_node", nodes.bypass_node)
   graph.add_node("query_analyzer", nodes.query_analyzer)
   graph.add_node("agent_node", nodes.agent_node)
   graph.add_node("tool_node", nodes.tool_node)
@@ -26,8 +28,24 @@ def build_rag_graph(
   graph.add_node("finalize_node", nodes.finalize_node)
 
 
-  # Entry point
-  graph.set_entry_point("query_analyzer")
+  # # Entry point
+  # graph.set_entry_point("query_analyzer")
+  def route_after_intent(state: RAGState) -> str:
+    if state.get("intent") == "legal":
+      return "query_analyzer"
+    return "bypass_node"
+
+  # Logic for intent router
+  graph.set_entry_point("intent_router")
+  graph.add_conditional_edges(
+    "intent_router",
+    route_after_intent,
+    {"query_analyzer": "query_analyzer", "bypass_node": "bypass_node"}
+  )
+  graph.add_edge("bypass_node", END)
+
+
+  # Logic for legal router
   graph.add_edge("query_analyzer", "agent_node")
 
   graph.add_conditional_edges(
@@ -70,6 +88,8 @@ class RAGOrchestrator:
       "retry_count": 0,
       "final_answer": "",
       "messages": [],
+      "intent": "",
+      "bypass_message": "",
     }
     logger.info(f"Starting RAG orchestration for query: {query[:80]}")
 
