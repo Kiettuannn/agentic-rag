@@ -26,6 +26,8 @@ class RAGState(TypedDict):
   retry_count: int
   final_answer: str
   messages: list  # Lưu hội thoại giữa Agent và Tool (AIMessage, ToolMessage...)
+  intent: str
+  bypass_message: str
 
 class RAGNodes:
   def __init__(self, retriever: Retriever, llm: LLMClient, langchain_llm, tools: list):
@@ -307,3 +309,44 @@ Trả về JSON với format sau (KHÔNG thêm gì khác):
       else:
         logger.info("[should_retry] Answer sufficient. Finalizing answer.")
       return "finalize_node"
+
+  def intent_router(self, state: RAGState) -> dict:
+    query = state["query"]
+    prompt = f"""Bạn là bộ lọc phân loại câu hỏi cho Trợ lý pháp lý Việt Nam.
+    Hãy phân loại câu hỏi sau thành 1 trong 3 loại:
+    - "legal": Các câu hỏi liên quan đến pháp luật, quy định, văn bản, thủ tục hành chính, phạt vi phạm, v.v. (Ví dụ: "Vượt đèn đỏ phạt bao nhiêu?", "Luật doanh nghiệp mới nhất")
+    - "chitchat": Các câu hỏi chào hỏi, cảm ơn, giao tiếp xã giao cơ bản (Ví dụ: "Chào bạn", "Cảm ơn bạn", "Bạn tên là gì?")
+    - "out_of_domain": Các câu hỏi về chủ đề khác ngoài pháp luật như thời tiết, lập trình, bóng đá, nấu ăn, v.v. (Ví dụ: "Thời tiết hôm nay thế nào?", "Làm sao để code Python?")
+    CÂU HỎI: {query}
+    Trả về định dạng JSON (KHÔNG thêm text nào khác ngoài JSON):
+    {{
+      "intent": "legal" | "chitchat" | "out_of_domain",
+      "reason": "lý do ngắn gọn"
+    }}"""
+    try:
+      raw = self.llm.invoke_json(prompt)
+      parsed = json.loads(raw)
+      intent = parsed.get("intent", "legal")
+      reason = parsed.get("reason", "")
+    except Exception as e:
+      logger.error(f"[intent_router] Lỗi phân tích LLM: {e}. Mặc định fallback về 'legal'.")
+      intent = "legal"
+      reason = f"Lỗi: {e}"
+
+    logger.info(f"[intent_router] Kết quả: intent={intent}, reason={reason}")
+    return {"intent": intent}
+
+  def bypass_node(self, state: RAGState) -> dict:
+    intent = state.get("intent", "out_of_domain")
+    logger.info(f"[bypass_node] Kích hoạt bypass do intent là '{intent}'.")
+
+    if intent == "chitchat":
+      answer = "Chào bạn! Tôi là trợ lý pháp lý AI. Tôi có thể giúp gì cho bạn trong việc tra cứu và giải đáp các quy định pháp luật Việt Nam?"
+    else:  # out_of_domain
+      answer = "Xin lỗi, tôi là trợ lý chuyên môn về Pháp luật Việt Nam nên không thể hỗ trợ bạn các vấn đề nằm ngoài lĩnh vực này. Vui lòng đặt các câu hỏi liên quan đến quy định, luật pháp."
+
+    return {
+      "answer": answer,
+      "final_answer": answer,
+      "context": "Bypass RAG (Không sử dụng tool tra cứu)."
+    }
